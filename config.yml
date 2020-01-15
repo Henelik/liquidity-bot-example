@@ -48,7 +48,7 @@ orderbook_manager:
     NANO: 0.0000010
     ETH: 0.0000010
 
-  monitor_period: 300
+  monitor_period: 120
   reserve_thresh_usd: 1.00
   price_tolerance: .01
   amount_tolerance: .05
