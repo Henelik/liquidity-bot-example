@@ -26,9 +26,9 @@ class MarketConfig(dict):
 
 class OrderbookManager:
 
-    def __init__(self, endpoint, key, config):
+    def __init__(self, api, config):
         self.config = config
-        self.api = QtradeAPI(endpoint, key=key)
+        self.api = api
         self.prev_alloc_profile = None
         self.market_configs = {
             ms: MarketConfig(ms, mkt, default=config['markets'].get('default'))
@@ -126,7 +126,7 @@ class OrderbookManager:
         if self.config['dry_run_mode']:
             log.warning(
                 "You are in dry run mode! Orders will not be cancelled or placed!")
-            pprint(allocation_profile)
+            #pprint(allocation_profile)
             return
 
         self.api.cancel_all_orders()
@@ -301,7 +301,8 @@ class OrderbookManager:
             log.info('No new trades!')
             return
         trades = {t['id']: t for t in res['trades']}
-        log.info("Bot made new trades:\n%s", pformat(trades))
+        if self.config['dry_run_mode'] is False:
+            log.info("Bot made new trades:\n%s", pformat(trades))
         self.most_recent_trade_id = max(trades.keys())
 
     async def monitor(self):
@@ -323,5 +324,8 @@ class OrderbookManager:
                 await asyncio.sleep(self.config['monitor_period'])
             except Exception:
                 log.warning("Orderbook manager loop exploded", exc_info=True)
-                # Just in case the entire program explodes, so that we don't have orders out.
-                self.api.cancel_market_orders()
+                try:
+                    # Just in case the entire program explodes, so that we don't have orders out.
+                    self.api.cancel_market_orders()
+                except Exception:
+                    pass

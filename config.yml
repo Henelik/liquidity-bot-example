@@ -2,11 +2,11 @@ orderbook_manager:
   markets:
     # configs are always "market_base" format
     DOGE_BTC:
-      BTC: .3
-      DOGE: 1
+      BTC: .25
+      DOGE: .8
     LTC_BTC:
-      BTC: .2
-      LTC: 1
+      BTC: .15
+      LTC: .8
       intervals:
         buy_limit:
           0.03: 0.1
@@ -21,11 +21,11 @@ orderbook_manager:
           0.13: 0.275
           0.20: 0.35
     NANO_BTC:
-      BTC: .2
-      NANO: 1
+      BTC: .15
+      NANO: .8
     ETH_BTC:
-      BTC: .3
-      ETH: 1
+      BTC: .25
+      ETH: .8
     default:
       intervals:
         buy_limit:
@@ -46,6 +46,7 @@ orderbook_manager:
     BTC: 0.00000010
     LTC: 0.001
     NANO: 0.0000010
+    ETH: 0.0000010
 
   monitor_period: 300
   reserve_thresh_usd: 1.00
@@ -64,3 +65,31 @@ market_data_collector:
     ccxt:
       markets: {'NANO/BTC':'NANO_BTC'}
       exchanges: ['binance', 'kucoin', 'kraken']
+
+vol_bot_manager:
+  markets:
+    DOGE_BTC:
+      BTC: .05
+      DOGE: .2
+    LTC_BTC:
+      BTC: .05
+      LTC: .2
+    NANO_BTC:
+      BTC: .05
+      NANO: .2
+    ETH_BTC:
+      BTC: .05
+      ETH: .2
+  currency_reserves:
+    DOGE: 0.01
+    BTC: 0.00000010
+    LTC: 0.001
+    NANO: 0.0000010
+    ETH: 0.0000010
+  dry: True
+  default:
+    q: 100
+    var: 2
+    amount: .3
+  
+
