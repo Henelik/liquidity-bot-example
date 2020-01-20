@@ -324,4 +324,7 @@ class OrderbookManager:
             except Exception:
                 log.warning("Orderbook manager loop exploded", exc_info=True)
                 # Just in case the entire program explodes, so that we don't have orders out.
-                self.api.cancel_market_orders()
+                try:
+                    self.api.cancel_market_orders()
+                except Exception:
+                    log.warning("Failed to cancel orders on abort recovery", exc_info=True)
