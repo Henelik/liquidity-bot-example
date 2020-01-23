@@ -68,6 +68,7 @@ def obm(ctx):
     loop.create_task(ctx.obj['obm'].monitor())
     loop.run_forever()
 
+
 @cli.command()
 @click.pass_context
 def vol(ctx):

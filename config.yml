@@ -87,6 +87,9 @@ vol_bot_manager:
     NANO: 0.0000010
     ETH: 0.0000010
   dry: True
+  # Causes the run loop to not actually sleep for testing purposes
+  fake_sleep: False
+  # Default trade generation parameters
   default:
     q: 100
     var: 2
