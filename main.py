@@ -3,9 +3,11 @@ import yaml
 import sys
 import click
 import logging as log
+from qtrade_client.api import QtradeAPI
 
 from market_data_collector import MarketDataCollector
 from orderbook_manager import OrderbookManager
+from vol_bot import VolBot
 
 
 @click.group()
@@ -26,12 +28,13 @@ def cli(ctx, config, endpoint, keyfile, verbose):
     handler.setFormatter(formatter)
     root.addHandler(handler)
 
-    hmac_key = keyfile.read().strip()
+    api = QtradeAPI(endpoint, key=keyfile.read().strip())
     config = yaml.load(config)
 
     ctx.obj['mdc'] = MarketDataCollector(config['market_data_collector'])
     ctx.obj['obm'] = OrderbookManager(
-        endpoint, hmac_key, config['orderbook_manager'])
+        api, config['orderbook_manager'])
+    ctx.obj['vol'] = VolBot(config, api)
 
 
 @cli.command()
@@ -41,6 +44,7 @@ def run(ctx):
     try:
         loop.create_task(ctx.obj['obm'].monitor())
         loop.create_task(ctx.obj['mdc'].daemon())
+        loop.create_task(ctx.obj['vol'].run())
         loop.run_forever()
     except KeyboardInterrupt:
         pass
@@ -62,6 +66,14 @@ def mdc(ctx):
 def obm(ctx):
     loop = asyncio.get_event_loop()
     loop.create_task(ctx.obj['obm'].monitor())
+    loop.run_forever()
+
+
+@cli.command()
+@click.pass_context
+def vol(ctx):
+    loop = asyncio.get_event_loop()
+    loop.create_task(ctx.obj['vol'].run())
     loop.run_forever()
 
 
