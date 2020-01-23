@@ -204,61 +204,65 @@ class VolBot:
             order_type, price, market_string=market_string, value=value,
             amount=amount, prevent_taker=False)['data']['order']
 
-    async def run(self):
-        while True:
+    async def generate_series(self):
+        if self.dry is True:
+            log.warning(
+                "You are in dry run mode for vol_bot! Orders will not be cancelled or placed!")
+
+        trades = self.generate_trades(self.q, self.var, self.amount)
+        log.debug(f"Generated trades: {trades}")
+        for count, trade in enumerate(trades):
+
+            # sleep the time needed and less than 10 seconds than that. It
+            # will never be zero, but might want to check
+            if count == 0:
+                sleep_time = trade.time_until
+            else:
+                sleep_time = trades[count].time_until - trades[count - 1].time_until
+                if sleep_time < 10:
+                    continue
+
+            log.info(f"Sleeping for {sleep_time - 10:.2f}")
+            await self.sleep(sleep_time - 10)
+            log.debug("Finished %s", (sleep_time - 10))
+
+            amounts = self.compute_allocations()
+            if not self.check_orderbook(trade):
+                # not first on order book
+                log.info('Not first on the book for %s', trade)
+                continue
+
+            price, quantity = self.price_trade(trade, amounts)
+            # need to change string to market_string
             if self.dry is True:
-                log.warning(
-                    "You are in dry run mode for vol_bot! Orders will not be cancelled or placed!")
+                # dry run
+                log.info("Would have executed %s @ %s", trade, price)
+                continue
 
-            strt_time = time.time()
-            trades = self.generate_trades(self.q, self.var, self.amount)
-            log.debug(f"Generated trades: {trades}")
-            for count, trade in enumerate(trades):
+            # place_order(self, order_type, market_string, price, quantity):
+            try:
+                new_order = self.place_order(trade.side, trade.curr_code, price, round(float(quantity), 6))
+            except Exception:
+                log.warn("Unknown error placing order", exc_info=True)
+                continue
+            except APIException as e:
+                log.warn(f"Failed to place order: {e}")
+                continue
 
-                # sleep the time needed and less than 10 seconds than that. It
-                # will never be zero, but might want to check
-                if count == 0:
-                    sleep_time = trade.time_until
-                else:
-                    sleep_time = trades[count].time_until - trades[count - 1].time_until
-                    if sleep_time < 10:
-                        continue
-                log.info(f"Sleeping for {sleep_time - 10:.2f}")
-                await self.sleep(sleep_time - 10)
-                log.debug("Finished %s", (sleep_time - 10))
+            # Fill or Kill - move to a different function once it works
+            await asyncio.sleep(1)
+            res = self.api.get(f"/v1/user/order/{new_order['id']}")
+            if res['open'] == 'true':
+                # Kill
+                self.api.post('/v1/user/cancel_order', json={'id': new_order['id']})
+            else:
+                # Fill
+                pass
 
-                amounts = self.compute_allocations()
-                if not self.check_orderbook(trade):
-                    # not first on order book
-                    log.info('Not first on the book for %s', trade)
-                    continue
-
-                price, quantity = self.price_trade(trade, amounts)
-                # need to change string to market_string
-                if self.dry is True:
-                    # dry run
-                    log.info("Would have executed %s @ %s", trade, price)
-                    continue
-
-                # place_order(self, order_type, market_string, price, quantity):
-                try:
-                    new_order = self.place_order(trade.side, trade.curr_code, price, round(float(quantity), 6))
-                except Exception:
-                    log.warn("Unknown error placing order", exc_info=True)
-                    continue
-                except APIException as e:
-                    log.warn(f"Failed to place order: {e}")
-                    continue
-
-                # Fill or Kill - move to a different function once it works
-                await asyncio.sleep(1)
-                res = self.api.get(f"/v1/user/order/{new_order['id']}")
-                if res['open'] == 'true':
-                    # Kill
-                    self.api.post('/v1/user/cancel_order', json={'id': new_order['id']})
-                else:
-                    # Fill
-                    pass
+    async def run(self):
+        strt_time = time.time()
+        while True:
+            await self.generate_series()
 
         remaining_time = strt_time + 3600 - time.time()
         log.info('Remaining Time: %s', remaining_time)
