@@ -26,8 +26,9 @@ class VolBot:
         self.amount = self.config['default']['amount']
         self.open_trade = 0
 
-        # this means it actually doesn't run
+        self.btc_price = self.config.get('btc_price', 8500)
         self.fake_sleep = self.config.get('fake_sleep', False)
+        # this means it actually doesn't run
         self.dry = self.config.get('dry', True)
 
     async def sleep(self, time):
@@ -208,6 +209,8 @@ class VolBot:
         if self.dry is True:
             log.warning(
                 "You are in dry run mode for vol_bot! Orders will not be cancelled or placed!")
+        else:
+            log.info("Running in production mode for vol_bot! Orders _will_ be placed!")
 
         trades = self.generate_trades(self.q, self.var, self.amount)
         log.debug(f"Generated trades: {trades}")
@@ -222,9 +225,10 @@ class VolBot:
                 if sleep_time < 10:
                     continue
 
-            log.info(f"Sleeping for {sleep_time - 10:.2f}")
-            await self.sleep(sleep_time - 10)
-            log.debug("Finished %s", (sleep_time - 10))
+            sleep_time -= 10
+            log.info(f"Sleeping for {sleep_time:.2f}")
+            await self.sleep(sleep_time)
+            log.debug(f"Finished sleeping for {sleep_time:.2f}")
 
             amounts = self.compute_allocations()
             if not self.check_orderbook(trade):
@@ -233,13 +237,14 @@ class VolBot:
                 continue
 
             price, quantity = self.price_trade(trade, amounts)
+            usd_value = round(self.btc_price * float(price) * float(quantity), 2)
             # need to change string to market_string
             if self.dry is True:
                 # dry run
-                log.info("Would have executed %s @ %s", trade, price)
+                log.info(f"Would've exec {trade} of {quantity:.4f} {trade.curr_code} @ {price} (${usd_value})")
                 continue
 
-            # place_order(self, order_type, market_string, price, quantity):
+            log.info(f"Placing order to exec {trade} of {quantity:.4f} {trade.curr_code} @ {price} (${usd_value})")
             try:
                 new_order = self.place_order(trade.side, trade.curr_code, price, round(float(quantity), 6))
             except Exception:
