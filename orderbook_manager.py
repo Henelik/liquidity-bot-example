@@ -141,7 +141,7 @@ class OrderbookManager:
     def place_order(self, order_type, market_string, price, quantity):
         if quantity <= 0:
             return
-        log.info("Placing %s on %s market for %s at %s",
+        log.debug("Placing %s on %s market for %s at %s",
                  order_type, market_string, quantity, price)
         if order_type == 'buy_limit':
             value = quantity
@@ -234,16 +234,19 @@ class OrderbookManager:
         allocs = self.compute_allocations()
         allocation_profile = {}
         for market, (market_amount, base_amount) in allocs.items():
-            if market in ExchangeDatastore.tickers['bittrex'].keys():
+            if 'bittrex' in ExchangeDatastore.tickers.keys() and market in ExchangeDatastore.tickers['bittrex'].keys():
                 bid = ExchangeDatastore.tickers['bittrex'][market]['bid']
                 ask = ExchangeDatastore.tickers['bittrex'][market]['ask']
-            elif market in ExchangeDatastore.tickers['ccxt'].keys():
+            elif 'ccxt' in ExchangeDatastore.tickers.keys() and market in ExchangeDatastore.tickers['ccxt'].keys():
                 bid = ExchangeDatastore.tickers['ccxt'][market]['bid']
                 ask = ExchangeDatastore.tickers['ccxt'][market]['ask']
+            elif 'qtrade' in ExchangeDatastore.tickers.keys() and market in ExchangeDatastore.tickers['qtrade'].keys():
+                bid = ExchangeDatastore.tickers['qtrade'][market]['bid']
+                ask = ExchangeDatastore.tickers['qtrade'][market]['ask']
             else:
                 log.warning(f"Can't get bid/ask price for {market} to generate orders!")
                 continue
-            log.info("Generating %s orders with bid %s and ask %s",
+            log.debug("Generating %s orders with bid %s and ask %s",
                      market, bid, ask)
             allocation_profile[market] = self.price_orders(
                 self.allocate_orders(market_amount, base_amount, market), bid, ask)
@@ -268,7 +271,7 @@ class OrderbookManager:
         return gain, self.btc_to_usd(gain).quantize(PERC)
 
     def coin_to_btc(self, coin, amt):
-        exchanges = ['bittrex', 'ccxt', 'qtrade']
+        exchanges = ['qtrade']
         for e in exchanges:
             try:
                 bid = ExchangeDatastore.tickers[e][coin + '_BTC']['bid']
@@ -292,7 +295,10 @@ class OrderbookManager:
         trades = {t['id']: t for t in self.api.get('/v1/user/trades')['trades']}
         newest_ids = heapq.nlargest(10, trades.keys())
         recent_trades = {id: trades[id] for id in newest_ids}
-        self.most_recent_trade_id = max(newest_ids)
+        if len(newest_ids) != 0:
+            self.most_recent_trade_id = max(newest_ids)
+        else:
+            self.most_recent_trade_id = 0
         log.info("10 most recent trades:\n%s", pformat(recent_trades))
 
     def check_for_trades(self):
@@ -303,7 +309,9 @@ class OrderbookManager:
         trades = {t['id']: t for t in res['trades']}
         if self.config['dry_run_mode'] is False:
             log.info("Bot made new trades:\n%s", pformat(trades))
+            return True
         self.most_recent_trade_id = max(trades.keys())
+        return False
 
     async def monitor(self):
         # Sleep to allow data scrapers to populate
@@ -320,7 +328,6 @@ class OrderbookManager:
                 btc_gain, usd_gain = self.estimate_account_gain(btc_val)
                 log.info("The bot has earned $%s, %s BTC",
                          usd_gain, btc_gain)
-                self.check_for_trades()
                 await asyncio.sleep(self.config['monitor_period'])
             except Exception:
                 log.warning("Orderbook manager loop exploded", exc_info=True)

@@ -34,7 +34,7 @@ def cli(ctx, config, endpoint, keyfile, verbose):
     ctx.obj['mdc'] = MarketDataCollector(config['market_data_collector'])
     ctx.obj['obm'] = OrderbookManager(
         api, config['orderbook_manager'])
-    ctx.obj['vol'] = VolBot(config, api)
+    #ctx.obj['vol'] = VolBot(config, api)
 
 
 @cli.command()
@@ -44,7 +44,7 @@ def run(ctx):
     try:
         loop.create_task(ctx.obj['obm'].monitor())
         loop.create_task(ctx.obj['mdc'].daemon())
-        loop.create_task(ctx.obj['vol'].run())
+        #loop.create_task(ctx.obj['vol'].run())
         loop.run_forever()
     except KeyboardInterrupt:
         pass
